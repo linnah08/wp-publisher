@@ -103,20 +103,61 @@
   .editor-body li { margin-bottom: 0.2em; }
   .editor-body a { color: var(--accent); }
   .editor-body blockquote { border-left: 3px solid var(--accent); margin: 0.8em 0; padding-left: 1em; color: var(--muted); font-style: italic; }
+
+  /* Login screen */
+  .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem 1rem; }
+  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 400px; }
+  .login-logo { font-family: 'DM Serif Display', serif; font-size: 24px; color: var(--accent); margin-bottom: 4px; }
+  .login-tagline { font-size: 13px; color: var(--muted); margin-bottom: 2rem; font-weight: 300; }
+  .login-field { margin-bottom: 1.25rem; }
+  .login-field label { display: block; font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+  .login-field input { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 300; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; outline: none; transition: border-color 0.15s; }
+  .login-field input:focus { border-color: var(--accent); background: #fff; }
+  .login-hint { font-size: 12px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+  .login-btn { width: 100%; margin-top: 1.5rem; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; padding: 12px; border-radius: 8px; border: none; background: var(--accent); color: #fff; cursor: pointer; transition: background 0.15s; }
+  .login-btn:hover { background: #234832; }
+  .login-btn:disabled { background: #a0b8a8; cursor: not-allowed; }
+  .login-error { margin-top: 1rem; padding: 10px 14px; background: var(--danger-light); color: var(--danger); border: 1px solid #f0c4c0; border-radius: 8px; font-size: 13px; display: none; }
+  .login-error.show { display: block; }
+  .user-bar { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 1rem; }
+  .user-bar span { color: var(--accent); font-weight: 500; }
+  .user-bar button { font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--muted); cursor: pointer; }
+  .user-bar button:hover { color: var(--danger); border-color: var(--danger); }
+  input[type="password"] { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 300; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; outline: none; transition: border-color 0.15s; -webkit-appearance: none; appearance: none; }
+  input[type="password"]:focus { border-color: var(--accent); background: #fff; }
 </style>
 </head>
 <body>
-<div class="wrapper">
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">WP Publisher</div>
+    <div class="login-tagline">Sign in with your WordPress credentials</div>
+    <div class="login-field">
+      <label>WordPress username</label>
+      <input type="text" id="loginUser" placeholder="your-username" autocomplete="username" />
+    </div>
+    <div class="login-field">
+      <label>Application password</label>
+      <input type="password" id="loginPass" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()" />
+      <div class="login-hint">Use an Application Password, not your main WordPress password.<br>Generate one at: WordPress admin → Users → Profile → Application Passwords</div>
+    </div>
+    <button class="login-btn" onclick="doLogin()" id="loginBtn">Sign in</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="wrapper" id="appWrapper" style="display:none;">
+  <div class="user-bar">
+    <div>Signed in as <span id="loggedInUser"></span></div>
+    <button onclick="doLogout()">Sign out</button>
+  </div>
   <header>
     <div class="logo">WP Publisher</div>
-    <div class="tagline">YOUR-WORDPRESS-SITE.com — post without touching WordPress</div>
+    <div class="tagline">post without touching WordPress</div>
   </header>
-
-  <div class="card">
-    <div class="card-title">Connection</div>
-    <button class="btn btn-ghost" onclick="testConnection()" id="testBtn">Test connection</button>
-    <div id="connStatus" class="status"></div>
-  </div>
 
   <div class="tabs">
     <button class="tab active" onclick="switchTab('new')">New article</button>
@@ -289,12 +330,58 @@
   </div>
 
 </div>
+</div>
 
 <script>
   const PROXY = 'YOUR_CLOUDFLARE_WORKER_URL';
-  const USER  = 'YOUR_WORDPRESS_USERNAME';
-  const PASS  = 'YOUR_APPLICATION_PASSWORD';
-  const AUTH  = 'Basic ' + btoa(USER + ':' + PASS);
+  let AUTH = '';
+
+  // --- Login / logout ---
+  function doLogin() {
+    const user = document.getElementById('loginUser').value.trim();
+    const pass = document.getElementById('loginPass').value.trim();
+    if (!user || !pass) {
+      showLoginError('Please enter your username and application password.');
+      return;
+    }
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = true; btn.textContent = 'Signing in...';
+    AUTH = 'Basic ' + btoa(user + ':' + pass);
+    fetch(PROXY + '/wp-json/wp/v2/users/me', { headers: { 'Authorization': AUTH } })
+      .then(r => r.json())
+      .then(data => {
+        if (data.name) {
+          document.getElementById('loginScreen').style.display = 'none';
+          document.getElementById('appWrapper').style.display = 'block';
+          document.getElementById('loggedInUser').textContent = data.name;
+          loadAuthors();
+          loadCategories();
+        } else {
+          AUTH = '';
+          showLoginError('Login failed — check your username and application password.');
+        }
+      })
+      .catch(() => {
+        AUTH = '';
+        showLoginError('Could not connect. Check your Worker URL or internet connection.');
+      })
+      .finally(() => { btn.disabled = false; btn.textContent = 'Sign in'; });
+  }
+
+  function doLogout() {
+    AUTH = '';
+    document.getElementById('loginUser').value = '';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('appWrapper').style.display = 'none';
+    document.getElementById('loggedInUser').textContent = '';
+  }
+
+  function showLoginError(msg) {
+    const el = document.getElementById('loginError');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
 
   let tags = { new: [], edit: [] };
   let imageFile = { new: null, edit: null };
@@ -382,7 +469,8 @@
   async function uploadImage(file) {
     const fd = new FormData();
     fd.append('file', file, file.name);
-    const res = await fetch(PROXY + '/wp-json/wp/v2/media', { method: 'POST', headers: { 'Authorization': AUTH }, body: fd });
+    const res = await fetch(PROXY + '/wp-json/wp/v2/media', { method: 'POST', headers: { 'Authorization': AUTH },
+      body: fd });
     const data = await res.json();
     if (data.id) return data.id;
     throw new Error(data.message || 'Upload failed');
@@ -619,8 +707,6 @@
     btn.disabled = false; btn.textContent = 'Save changes';
   }
 
-  loadAuthors();
-  loadCategories();
 </script>
 </body>
 </html>

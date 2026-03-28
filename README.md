@@ -101,23 +101,19 @@ Application passwords are separate from your main WordPress password and can be 
 
 ### Step 3 — Configure the publisher tool
 
-Open `publisher.html` in a text editor and find these three lines near the bottom inside the `<script>` tag:
+Open `publisher.html` in a text editor and find this one line near the bottom inside the `<script>` tag:
 
 ```javascript
 const PROXY = 'YOUR_CLOUDFLARE_WORKER_URL';
-const USER  = 'YOUR_WORDPRESS_USERNAME';
-const PASS  = 'YOUR_APPLICATION_PASSWORD';
 ```
 
-Replace the values:
+Replace it with your Worker URL:
 
 ```javascript
 const PROXY = 'https://my-site-proxy.yourname.workers.dev';
-const USER  = 'your-wordpress-username';
-const PASS  = 'AbCd EfGh IjKl MnOp QrSt UvWx';
 ```
 
-Save the file. That's it.
+That's the only change needed. No credentials live in the file — users enter their own WordPress username and application password on the login screen each time they open the tool.
 
 ---
 
@@ -137,7 +133,7 @@ The tool works fully offline except for the actual publish/save action, which re
 
 Just send them the configured `publisher.html` file. They open it in their browser — no account, no installation, no WordPress login needed.
 
-**Security note:** The application password is embedded in the file. Only share it with people you trust. If you need to revoke access, go to **WordPress admin → Users → Profile → Application Passwords** and delete the relevant password. Generate a new one and update the file for anyone who still needs access.
+**Security note:** The HTML file contains no credentials at all. Users log in with their own WordPress username and application password each session — credentials are held in memory only and disappear when the tab closes. The `publisher.html` file is completely safe to share publicly or put on GitHub as-is. To revoke someone's access, delete their application password in WordPress admin.
 
 ---
 
